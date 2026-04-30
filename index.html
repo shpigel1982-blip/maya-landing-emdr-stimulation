@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <title>גירוי בילטרלי</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            background: #000;
+            color: #fff;
+            font-family: 'Heebo', system-ui, sans-serif;
+            overflow: hidden;
+            height: 100%;
+            width: 100%;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        #canvas {
+            position: fixed;
+            inset: 0;
+            display: block;
+            background: #000;
+        }
+        .controls {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(18,18,18,0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 16px 22px;
+            border-radius: 16px;
+            display: flex;
+            gap: 22px;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.08);
+            z-index: 10;
+            flex-wrap: wrap;
+            max-width: calc(100vw - 32px);
+            justify-content: center;
+            transition: opacity 0.25s, transform 0.25s;
+        }
+        .controls.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-50%) translateY(20px);
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .label {
+            font-size: 15px;
+            font-weight: 500;
+            color: #ddd;
+        }
+        .speed-display {
+            font-variant-numeric: tabular-nums;
+            min-width: 64px;
+            text-align: center;
+            font-size: 16px;
+            color: #fff;
+            font-weight: 500;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 180px;
+            height: 4px;
+            background: rgba(255,255,255,0.18);
+            border-radius: 999px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle .slider-bg {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #3a3a3a;
+            border-radius: 24px;
+            transition: background 0.2s;
+        }
+        .toggle .slider-bg::before {
+            content: '';
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            right: 3px;
+            top: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .toggle input:checked + .slider-bg {
+            background: #5b8def;
+        }
+        .toggle input:checked + .slider-bg::before {
+            transform: translateX(-20px);
+        }
+        .start-btn {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 9px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            min-width: 80px;
+            transition: background 0.15s;
+        }
+        .start-btn:hover { background: #ececec; }
+        .start-btn.active { background: #ff6b6b; color: #fff; }
+        .start-btn.active:hover { background: #ff5252; }
+        .hint {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            color: rgba(255,255,255,0.35);
+            font-size: 13px;
+            z-index: 11;
+            pointer-events: none;
+        }
+        @media (max-width: 700px) {
+            .controls {
+                gap: 14px;
+                padding: 14px 16px;
+                bottom: 14px;
+            }
+            input[type="range"] { width: 130px; }
+            .speed-display { min-width: 56px; font-size: 14px; }
+            .label { font-size: 14px; }
+            .hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="hint">רווח להפעלה / עצירה · H להסתרת בקרים</div>
+    <div class="controls" id="controls">
+        <button class="start-btn" id="startBtn">התחל</button>
+        <div class="control-group">
+            <label class="label">מהירות</label>
+            <input type="range" id="speed" min="0.3" max="3" step="0.1" value="1">
+            <span class="speed-display" id="speedDisplay">1.0 Hz</span>
+        </div>
+        <div class="control-group">
+            <label class="label" for="randomToggle">רנדומלי</label>
+            <label class="toggle">
+                <input type="checkbox" id="randomToggle">
+                <span class="slider-bg"></span>
+            </label>
+        </div>
+        <div class="control-group">
+            <label class="label" for="flashToggle">היבהוב</label>
+            <label class="toggle">
+                <input type="checkbox" id="flashToggle">
+                <span class="slider-bg"></span>
+            </label>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const speedSlider = document.getElementById('speed');
+        const speedDisplay = document.getElementById('speedDisplay');
+        const randomToggle = document.getElementById('randomToggle');
+        const flashToggle = document.getElementById('flashToggle');
+        const startBtn = document.getElementById('startBtn');
+        const controls = document.getElementById('controls');
+
+        let dpr = window.devicePixelRatio || 1;
+        let width = 0, height = 0;
+
+        function resize() {
+            dpr = window.devicePixelRatio || 1;
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            paintBackground();
+            if (!running) drawIdleDot();
+        }
+
+        function paintBackground() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        let running = false;
+        let phase = 0;
+        let lastFrameTime = 0;
+        let elapsed = 0;
+
+        let angle = 0;
+        let targetAngle = 0;
+        let nextAngleChangeTime = 4;
+
+        let kickActive = false;
+        let kickStart = 0;
+        let kickDuration = 0;
+        let kickOffset = { x: 0, y: 0 };
+        let nextKickTime = 6;
+
+        let nextFlashTime = 3;
+        let flashUntil = 0;
+
+        const dotRadius = 22;
+
+        function updateRandom(t, dt) {
+            if (!randomToggle.checked) {
+                targetAngle = 0;
+                nextAngleChangeTime = t + 4 + Math.random() * 6;
+                if (kickActive && t > kickStart + kickDuration) kickActive = false;
+                if (!kickActive) nextKickTime = t + 5 + Math.random() * 8;
+            } else {
+                if (t > nextAngleChangeTime) {
+                    nextAngleChangeTime = t + 4 + Math.random() * 6;
+                    if (Math.random() < 0.4) {
+                        targetAngle = 0;
+                    } else {
+                        targetAngle = (Math.random() - 0.5) * (Math.PI / 180 * 50);
+                    }
+                }
+                if (!kickActive && t > nextKickTime) {
+                    nextKickTime = t + 6 + Math.random() * 8;
+                    kickActive = true;
+                    kickStart = t;
+                    kickDuration = 0.35 + Math.random() * 0.45;
+                    const vDir = Math.random() < 0.5 ? -1 : 1;
+                    kickOffset = {
+                        x: (Math.random() - 0.5) * width * 0.25,
+                        y: vDir * (60 + Math.random() * Math.min(220, height * 0.25))
+                    };
+                }
+                if (kickActive && t > kickStart + kickDuration) {
+                    kickActive = false;
+                }
+            }
+            const lerp = Math.min(1, dt * 3);
+            angle += (targetAngle - angle) * lerp;
+        }
+
+        function shouldFlash(t) {
+            if (!flashToggle.checked) {
+                flashUntil = 0;
+                nextFlashTime = t + 2 + Math.random() * 4;
+                return false;
+            }
+            if (t > nextFlashTime) {
+                nextFlashTime = t + 1.2 + Math.random() * 3.5;
+                flashUntil = t + 0.06 + Math.random() * 0.14;
+            }
+            return t < flashUntil;
+        }
+
+        function drawDot(x, y) {
+            ctx.shadowBlur = 28;
+            ctx.shadowColor = '#fff';
+            ctx.beginPath();
+            ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawIdleDot() {
+            paintBackground();
+            drawDot(width / 2, height / 2);
+        }
+
+        function animate(now) {
+            if (!running) return;
+            const dt = lastFrameTime ? Math.min(0.1, (now - lastFrameTime) / 1000) : 0;
+            lastFrameTime = now;
+            elapsed += dt;
+
+            const speed = parseFloat(speedSlider.value);
+            phase += 2 * Math.PI * speed * dt;
+
+            paintBackground();
+            updateRandom(elapsed, dt);
+
+            const margin = Math.min(80, width * 0.06);
+            const amplitude = (width - 2 * margin) / 2;
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            const baseX = amplitude * Math.sin(phase);
+            const rotX = baseX * Math.cos(angle);
+            const rotY = baseX * Math.sin(angle);
+
+            let x = centerX + rotX;
+            let y = centerY + rotY;
+
+            if (kickActive) {
+                const kickT = (elapsed - kickStart) / kickDuration;
+                const strength = Math.sin(Math.max(0, Math.min(1, kickT)) * Math.PI);
+                x += kickOffset.x * strength;
+                y += kickOffset.y * strength;
+            }
+
+            if (!shouldFlash(elapsed)) {
+                drawDot(x, y);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function start() {
+            running = true;
+            startBtn.textContent = 'עצור';
+            startBtn.classList.add('active');
+            lastFrameTime = 0;
+            requestAnimationFrame(animate);
+        }
+        function stop() {
+            running = false;
+            startBtn.textContent = 'התחל';
+            startBtn.classList.remove('active');
+            drawIdleDot();
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (running) stop(); else start();
+        });
+
+        speedSlider.addEventListener('input', () => {
+            speedDisplay.textContent = parseFloat(speedSlider.value).toFixed(1) + ' Hz';
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (running) stop(); else start();
+            } else if (e.key === 'h' || e.key === 'H') {
+                controls.classList.toggle('hidden');
+            } else if (e.key === 'Escape' && running) {
+                stop();
+            }
+        });
+
+        // tap on canvas (away from controls) toggles controls visibility on touch devices
+        let lastTap = 0;
+        canvas.addEventListener('click', (e) => {
+            const now = Date.now();
+            if (now - lastTap < 350) {
+                controls.classList.toggle('hidden');
+            }
+            lastTap = now;
+        });
+
+        window.addEventListener('resize', resize);
+        resize();
+        drawIdleDot();
+    </script>
+</body>
+</html>
