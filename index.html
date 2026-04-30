@@ -246,7 +246,8 @@
         let nextKickTime = 6;
 
         let nextFlashTime = 3;
-        let flashUntil = 0;
+        let flashStart = 0;
+        let flashDuration = 0;
 
         const dotRadius = 22;
 
@@ -284,26 +285,38 @@
             angle += (targetAngle - angle) * lerp;
         }
 
-        function shouldFlash(t) {
+        function flashStrength(t) {
             if (!flashToggle.checked) {
-                flashUntil = 0;
+                flashStart = 0;
+                flashDuration = 0;
                 nextFlashTime = t + 2 + Math.random() * 4;
-                return false;
+                return 0;
             }
-            if (t > nextFlashTime) {
-                nextFlashTime = t + 1.2 + Math.random() * 3.5;
-                flashUntil = t + 0.06 + Math.random() * 0.14;
+            if (t > nextFlashTime && t > flashStart + flashDuration) {
+                nextFlashTime = t + 2 + Math.random() * 5;
+                flashStart = t;
+                flashDuration = 0.8 + Math.random() * 0.5;
             }
-            return t < flashUntil;
+            if (t >= flashStart && t < flashStart + flashDuration) {
+                const p = (t - flashStart) / flashDuration;
+                return Math.sin(p * Math.PI);
+            }
+            return 0;
         }
 
-        function drawDot(x, y) {
-            ctx.shadowBlur = 28;
+        function drawDot(x, y, glowBoost) {
+            const boost = glowBoost || 0;
+            const radius = dotRadius + boost * 7;
+            ctx.shadowBlur = 28 + boost * 60;
             ctx.shadowColor = '#fff';
             ctx.beginPath();
-            ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
             ctx.fillStyle = '#fff';
             ctx.fill();
+            if (boost > 0) {
+                ctx.shadowBlur = 28 + boost * 60;
+                ctx.fill();
+            }
             ctx.shadowBlur = 0;
         }
 
@@ -343,9 +356,8 @@
                 y += kickOffset.y * strength;
             }
 
-            if (!shouldFlash(elapsed)) {
-                drawDot(x, y);
-            }
+            const glow = flashStrength(elapsed);
+            drawDot(x, y, glow);
 
             requestAnimationFrame(animate);
         }
